@@ -11,9 +11,11 @@ services:
         value: devnet
       - key: REDIS_URL
         fromService:
+          type: redis
           name: paymaster-redis
           property: connectionString
       - key: SERVER_PRIVATE_KEY
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: ALLOWED_ORIGINS
@@ -22,3 +24,4 @@ services:
   - type: redis
     name: paymaster-redis
     plan: free
+    ipAllowList: []
