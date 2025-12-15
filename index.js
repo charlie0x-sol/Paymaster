@@ -100,7 +100,8 @@ const authenticateJWT = (req, res, next) => {
   }
 };
 
-const connection = new web3.Connection(web3.clusterApiUrl('devnet'));
+const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
+const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
 
 // Start Balance Monitor (Monitor primary key)
 const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);

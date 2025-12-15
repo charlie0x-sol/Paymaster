@@ -95,7 +95,8 @@ describe('Key Rotation', () => {
     const token = verifyRes.body.token;
 
     // 2. Create transaction with OLD key as fee payer
-    const connection = new web3.Connection(web3.clusterApiUrl('devnet')); // Mocked
+    const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
+    const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork)); // Mocked
     const transaction = new web3.Transaction().add(
       web3.SystemProgram.transfer({
         fromPubkey: clientKeypair.publicKey,

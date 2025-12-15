@@ -8,7 +8,8 @@ const axios = require('axios');
     const clientKeypair = web3.Keypair.generate();
 
     // Connect to the devnet
-    const connection = new web3.Connection(web3.clusterApiUrl('devnet'));
+    const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
+    const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
 
     // Airdrop some SOL to the client keypair
     console.log('Requesting airdrop...');

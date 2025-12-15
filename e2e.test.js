@@ -67,7 +67,8 @@ describe('End-to-End Flow', () => {
   it('should complete the full challenge -> verify -> relay flow', async () => {
     // 1. Setup client and get airdrop (mocked)
     const clientKeypair = web3.Keypair.generate();
-    const connection = new web3.Connection(web3.clusterApiUrl('devnet'));
+    const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
+    const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
     const airdropSignature = await connection.requestAirdrop(
       clientKeypair.publicKey,
       web3.LAMPORTS_PER_SOL
