@@ -1,0 +1,18 @@
+{
+  "name": "client-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "send-tx.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "axios": "^1.12.2",
+    "bs58": "^6.0.0"
+  }
+}
