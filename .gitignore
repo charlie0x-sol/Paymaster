@@ -32,3 +32,11 @@ coverage/
 
 # Temporary
 tmp/
+
+# Internal Documentation & Planning
+ACT.md
+PLAN.md
+PRODUCTION_ROADMAP.md
+RESEARCH.md
+TEST.md
+TODO.md
