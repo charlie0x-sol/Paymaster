@@ -10,8 +10,9 @@ services:
       - key: SOLANA_NETWORK
         value: devnet
       - key: REDIS_URL
-        fromService: paymaster-redis
-        property: connectionString
+        fromService:
+          name: paymaster-redis
+          property: connectionString
       - key: SERVER_PRIVATE_KEY
       - key: JWT_SECRET
         generateValue: true
