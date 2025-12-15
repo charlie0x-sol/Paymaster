@@ -120,6 +120,8 @@ Relays a transaction to the configured Solana network.
 
 ## Deployment
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
 This project includes a `Dockerfile` and `docker-compose.yml` for easy deployment.
 
 To build and run the Docker container:

@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: paymaster
+    env: docker
+    plan: free
+    healthCheckPath: /metrics
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SOLANA_NETWORK
+        value: devnet
+      - key: REDIS_URL
+        fromService: paymaster-redis
+        property: connectionString
+      - key: SERVER_PRIVATE_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+  - type: redis
+    name: paymaster-redis
+    plan: free
+    ipAllowList: [] # internal only
