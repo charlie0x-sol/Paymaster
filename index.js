@@ -17,6 +17,9 @@ const { logger } = require('./logger');
 
 const app = express();
 
+// Trust proxy for rate limiting behind Render's load balancer
+app.enable('trust proxy');
+
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*';
 app.use(cors({
