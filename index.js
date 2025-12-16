@@ -108,7 +108,7 @@ const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);
 // Don't start it immediately in test mode usually, but for this prototype it's fine.
 // We can handle cleanup in exports.
 
-app.get('/metrics', strictLimiter, async (req, res) => {
+app.get('/metrics', async (req, res) => {
   try {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
