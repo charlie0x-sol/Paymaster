@@ -108,6 +108,14 @@ const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);
 // Don't start it immediately in test mode usually, but for this prototype it's fine.
 // We can handle cleanup in exports.
 
+app.get('/', (req, res) => {
+  res.send({
+    service: 'paymaster-relayer',
+    status: 'running',
+    relayerPublicKey: primaryKeypair.publicKey.toBase58(),
+  });
+});
+
 app.get('/metrics', async (req, res) => {
   try {
     res.set('Content-Type', register.contentType);
