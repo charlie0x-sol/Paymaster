@@ -12,6 +12,7 @@ This relayer is designed to be a flexible and robust solution that can be custom
 *   **Authentication:** A challenge-response mechanism ensures that only authorized users can use the relayer.
 *   **Key Rotation:** Supports primary and secondary signing keys for seamless key rotation.
 *   **Metrics and Monitoring:** Exposes a `/metrics` endpoint for Prometheus scraping, and includes a balance monitor for the relayer's wallet.
+*   **Priority Fees Support:** The relayer can process transactions that include `ComputeBudgetProgram` instructions for priority fees, ensuring reliability during network congestion.
 *   **Containerized:** Ships with a `Dockerfile` and `docker-compose.yml` for easy deployment.
 
 ## Getting Started
