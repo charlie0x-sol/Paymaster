@@ -1,8 +1,12 @@
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 
-const server = spawn('node', ['index.js'], {
+console.log('Building project...');
+execSync('npm run build', { stdio: 'inherit' });
+
+console.log('Starting server via npm start...');
+const server = spawn('npm', ['start'], {
     cwd: process.cwd(),
     stdio: 'inherit' // Inherit stdio so we see logs
 });

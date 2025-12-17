@@ -1,4 +1,4 @@
-const client = require('prom-client');
+import client from 'prom-client';
 
 // Create a Registry
 const register = new client.Registry();
@@ -34,7 +34,7 @@ register.registerMetric(relaySuccessCounter);
 register.registerMetric(relayFailureCounter);
 register.registerMetric(walletBalanceGauge);
 
-module.exports = {
+export {
   register,
   relaySuccessCounter,
   relayFailureCounter,

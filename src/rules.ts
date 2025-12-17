@@ -1,15 +1,13 @@
-console.log('Rules: Loading redisClient...');
-const client = require('./redisClient');
-console.log('Rules: Loading config...');
-const config = require('./config');
-console.log('Rules: Loading logger...');
-const { logger } = require('./logger');
+import client from './redisClient';
+import config from './config';
+import { logger } from './logger';
+import * as web3 from '@solana/web3.js';
 
 class RulesEngine {
   constructor() {
   }
 
-  isOnboardingTask(transaction) {
+  isOnboardingTask(transaction: web3.Transaction): boolean {
     if (!transaction || !transaction.instructions) {
       return false;
     }
@@ -24,7 +22,7 @@ class RulesEngine {
     return false;
   }
 
-  async isSponsored(connection, transaction, publicKey) {
+  async isSponsored(connection: web3.Connection, transaction: web3.Transaction, publicKey: string): Promise<boolean> {
     // 1. Check Blacklist
     if (config.BLACKLIST_ADDRESSES.includes(publicKey)) {
       return false;
@@ -43,7 +41,7 @@ class RulesEngine {
     }
 
     // 4. Check dynamic gas limit (Cost)
-    let estimatedFeeLamports;
+    let estimatedFeeLamports: number;
     try {
       const message = transaction.compileMessage();
       const feeResponse = await connection.getFeeForMessage(message);
@@ -52,7 +50,7 @@ class RulesEngine {
       } else {
         throw new Error('Fee response null');
       }
-    } catch (err) {
+    } catch (err: any) {
       // Fallback to rough estimate if API fails
       logger.warn('Failed to get exact fee, using estimate', { error: err.message });
       let numSignatures = 1; // Relayer
@@ -69,7 +67,8 @@ class RulesEngine {
     const costKey = `txn_cost:${publicKey}`;
     // incrbyfloat returns string in some redis versions, or float.
     // We store as string or float.
-    const currentCost = parseFloat(await client.incrByFloat(costKey, estimatedFeeSol));
+    const currentCostStr = await client.incrByFloat(costKey, estimatedFeeSol);
+    const currentCost = parseFloat(currentCostStr.toString());
 
     if (currentCost > config.MAX_SPONSORED_AMOUNT_SOL) {
       return false;
@@ -79,4 +78,4 @@ class RulesEngine {
   }
 }
 
-module.exports = new RulesEngine();
+export default new RulesEngine();

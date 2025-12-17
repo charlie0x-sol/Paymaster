@@ -1,11 +1,11 @@
-const winston = require('winston');
+import winston from 'winston';
 
 // List of keys to redact
 const SENSITIVE_KEYS = ['privateKey', 'secret', 'token', 'authorization', 'signature'];
 
 // Custom format to redact sensitive data
 const redactSecrets = winston.format((info) => {
-  const redact = (obj) => {
+  const redact = (obj: any) => {
     for (const key in obj) {
       if (typeof obj[key] === 'object' && obj[key] !== null) {
         redact(obj[key]);
@@ -39,4 +39,4 @@ const logger = winston.createLogger({
   ],
 });
 
-module.exports = { logger, redactSecrets };
+export { logger, redactSecrets };

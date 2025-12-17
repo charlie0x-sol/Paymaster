@@ -1,6 +1,13 @@
 // Configuration for the rules engine
 
-module.exports = {
+interface Config {
+  ALLOWED_PROGRAM_IDS: string[];
+  BLACKLIST_ADDRESSES: string[];
+  MAX_SPONSORED_TRANSACTIONS: number;
+  MAX_SPONSORED_AMOUNT_SOL: number;
+}
+
+const config: Config = {
   // List of Program IDs that are considered "Onboarding Tasks" and are always sponsored (or have a separate limit)
   ALLOWED_PROGRAM_IDS: process.env.ALLOWED_PROGRAM_IDS 
     ? process.env.ALLOWED_PROGRAM_IDS.split(',') 
@@ -23,3 +30,5 @@ module.exports = {
   // Max sponsored amount in SOL per user (cumulative)
   MAX_SPONSORED_AMOUNT_SOL: parseFloat(process.env.MAX_SPONSORED_AMOUNT_SOL || '0.0001'),
 };
+
+export default config;

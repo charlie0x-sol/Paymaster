@@ -1,9 +1,14 @@
-const web3 = require('@solana/web3.js');
-const { walletBalanceGauge } = require('./metrics');
-const { logger } = require('./logger');
+import * as web3 from '@solana/web3.js';
+import { walletBalanceGauge } from './metrics';
+import { logger } from './logger';
 
 class BalanceMonitor {
-  constructor(connection, publicKey, lowBalanceThreshold = 1.0) {
+  connection: web3.Connection;
+  publicKey: web3.PublicKey;
+  lowBalanceThreshold: number;
+  intervalId: NodeJS.Timeout | null;
+
+  constructor(connection: web3.Connection, publicKey: web3.PublicKey, lowBalanceThreshold: number = 1.0) {
     this.connection = connection;
     this.publicKey = publicKey;
     this.lowBalanceThreshold = lowBalanceThreshold;
@@ -23,19 +28,19 @@ class BalanceMonitor {
       if (solBalance < this.lowBalanceThreshold) {
         this.alertLowBalance(solBalance);
       }
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to check wallet balance', { error: error.message });
     }
   }
 
-  alertLowBalance(balance) {
+  alertLowBalance(balance: number) {
     logger.warn('LOW BALANCE ALERT', { 
       message: `Relayer wallet is running low on funds! Current: ${balance} SOL. Threshold: ${this.lowBalanceThreshold} SOL` 
     });
     // In a real app, integrate with Slack/PagerDuty/Email here
   }
 
-  start(intervalMs = 60000) { // Default 1 minute
+  start(intervalMs: number = 60000) { // Default 1 minute
     if (this.intervalId) return;
     logger.info('Starting balance monitor', { intervalMs });
     
@@ -56,4 +61,4 @@ class BalanceMonitor {
   }
 }
 
-module.exports = BalanceMonitor;
+export default BalanceMonitor;

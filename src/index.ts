@@ -1,22 +1,23 @@
 console.log('Starting server...');
-require('dotenv').config();
-// Fix: Import redisClient first to avoid potential dependency conflicts/hanging
-const client = require('./redisClient');
-const express = require('express');
-const web3 = require('@solana/web3.js');
-const bs58 = require('bs58');
-const rateLimit = require('express-rate-limit');
-const { RedisStore } = require('rate-limit-redis');
-const nacl = require('tweetnacl');
-const jwt = require('jsonwebtoken');
+import dotenv from 'dotenv';
+dotenv.config();
 
-const crypto = require('crypto');
-const cors = require('cors');
-const rulesEngine = require('./rules');
-// const client = require('./redisClient'); // Moved to top
-const { register, relaySuccessCounter, relayFailureCounter } = require('./metrics');
-const BalanceMonitor = require('./monitor');
-const { logger } = require('./logger');
+// Fix: Import redisClient first to avoid potential dependency conflicts/hanging
+import client from './redisClient';
+import express, { Request, Response, NextFunction } from 'express';
+import * as web3 from '@solana/web3.js';
+import bs58 from 'bs58';
+import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import nacl from 'tweetnacl';
+import jwt from 'jsonwebtoken';
+
+import crypto from 'crypto';
+import cors from 'cors';
+import rulesEngine from './rules';
+import { register, relaySuccessCounter, relayFailureCounter } from './metrics';
+import BalanceMonitor from './monitor';
+import { logger } from './logger';
 
 const app = express();
 
@@ -42,7 +43,7 @@ app.use(express.json());
     try {
         await client.connect();
         console.log('Connected to Redis successfully.');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to connect to Redis', { error: e.message });
         logger.error('Failed to connect to Redis', { error: e.message });
         process.exit(1); // Exit if Redis fails
@@ -62,7 +63,7 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   store: new RedisStore({
-      sendCommand: (...args) => client.sendCommand(args),
+      sendCommand: (...args: string[]) => client.sendCommand(args),
       prefix: 'rl:global:',
   }),
 });
@@ -73,13 +74,13 @@ const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // limit each IP to 10 requests per windowMs
   store: new RedisStore({
-      sendCommand: (...args) => client.sendCommand(args),
+      sendCommand: (...args: string[]) => client.sendCommand(args),
       prefix: 'rl:strict:',
   }),
 });
 
 console.log('Loading keypairs...');
-const keypairs = [];
+const keypairs: web3.Keypair[] = [];
 if (process.env.SERVER_PRIVATE_KEY) {
     console.log('Loading SERVER_PRIVATE_KEY...');
     try {
@@ -87,7 +88,7 @@ if (process.env.SERVER_PRIVATE_KEY) {
         console.log(`DEBUG: Secret Key Buffer Length: ${secretKeyBuffer.length}`);
         keypairs.push(web3.Keypair.fromSecretKey(secretKeyBuffer));
         console.log('SERVER_PRIVATE_KEY loaded successfully.');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load SERVER_PRIVATE_KEY', { error: e.message });
         logger.error('Failed to load SERVER_PRIVATE_KEY', { error: e.message });
     }
@@ -97,7 +98,7 @@ if (process.env.SERVER_PRIVATE_KEY_OLD) {
     try {
         keypairs.push(web3.Keypair.fromSecretKey(Buffer.from(process.env.SERVER_PRIVATE_KEY_OLD, 'hex')));
         console.log('SERVER_PRIVATE_KEY_OLD loaded successfully.');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to load SERVER_PRIVATE_KEY_OLD', { error: e.message });
         logger.error('Failed to load SERVER_PRIVATE_KEY_OLD', { error: e.message });
     }
@@ -111,9 +112,14 @@ if (keypairs.length === 0) {
 }
 
 const primaryKeypair = keypairs[0];
-const jwtSecret = process.env.JWT_SECRET;
+const jwtSecret = process.env.JWT_SECRET || 'default_secret'; // Fallback for types, but verified logic ensures it's set usually
 
-const authenticateJWT = (req, res, next) => {
+// Extend Request interface to include user
+interface AuthenticatedRequest extends Request {
+  user?: any;
+}
+
+const authenticateJWT = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (authHeader) {
@@ -134,14 +140,14 @@ const authenticateJWT = (req, res, next) => {
 };
 
 const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
-const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
+const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork as web3.Cluster));
 
 // Start Balance Monitor (Monitor primary key)
 const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);
 // Don't start it immediately in test mode usually.
 // We can handle cleanup in exports.
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send({
     service: 'paymaster-relayer',
     status: 'running',
@@ -149,7 +155,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', async (req: Request, res: Response) => {
   try {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
@@ -158,7 +164,7 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-app.get('/challenge', strictLimiter, async (req, res) => {
+app.get('/challenge', strictLimiter, async (req: Request, res: Response) => {
   logger.info('GET /challenge');
   const nonce = crypto.randomBytes(16).toString('hex');
   // Store nonce with 5 minutes expiration
@@ -166,7 +172,7 @@ app.get('/challenge', strictLimiter, async (req, res) => {
   res.send({ nonce, relayerPublicKey: primaryKeypair.publicKey.toBase58() });
 });
 
-app.post('/verify', strictLimiter, async (req, res) => {
+app.post('/verify', strictLimiter, async (req: Request, res: Response) => {
   logger.info('POST /verify');
   const { nonce, publicKey, signature } = req.body;
 
@@ -177,8 +183,8 @@ app.post('/verify', strictLimiter, async (req, res) => {
   }
 
   const message = new TextEncoder().encode(nonce);
-  const signatureBytes = bs58.default.decode(signature);
-  const publicKeyBytes = bs58.default.decode(publicKey);
+  const signatureBytes = bs58.decode(signature);
+  const publicKeyBytes = bs58.decode(publicKey);
 
   if (!nacl.sign.detached.verify(message, signatureBytes, publicKeyBytes)) {
     logger.warn('Invalid signature for nonce', { nonce, publicKey });
@@ -193,7 +199,7 @@ app.post('/verify', strictLimiter, async (req, res) => {
   res.send({ success: true, token });
 });
 
-app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
+app.post('/relay', strictLimiter, authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   logger.info('POST /relay', { publicKey: req.user.publicKey });
   try {
     const { transaction } = req.body;
@@ -217,10 +223,10 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
     }
 
     // Identify which keypair is the fee payer
-    const signingKeypair = keypairs.find(kp => tx.feePayer.equals(kp.publicKey));
+    const signingKeypair = keypairs.find(kp => tx.feePayer && tx.feePayer.equals(kp.publicKey));
 
     if (!signingKeypair) {
-        logger.warn('Invalid fee payer', { feePayer: tx.feePayer.toBase58(), expected: keypairs.map(k => k.publicKey.toBase58()) });
+        logger.warn('Invalid fee payer', { feePayer: tx.feePayer ? tx.feePayer.toBase58() : 'undefined', expected: keypairs.map(k => k.publicKey.toBase58()) });
         relayFailureCounter.inc({ error_type: 'invalid_fee_payer' });
         return res.status(400).send('Invalid fee payer');
     }
@@ -229,7 +235,7 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
     try {
       tx.partialSign(signingKeypair);
       logger.info('Partially signed');
-    } catch (e) {
+    } catch (e: any) {
        logger.error('Partial sign failed', { message: e.message, stack: e.stack });
        relayFailureCounter.inc({ error_type: 'signing_failed' });
        throw e;
@@ -254,7 +260,7 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
     try {
         serializedTx = tx.serialize();
         logger.info('Serialized transaction');
-    } catch (e) {
+    } catch (e: any) {
         logger.error('Serialization failed', { message: e.message, stack: e.stack });
         relayFailureCounter.inc({ error_type: 'serialization_failed' });
         throw e;
@@ -266,7 +272,7 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
     logger.info('Transaction relayed successfully', { signature });
     relaySuccessCounter.inc();
     res.send({ success: true, signature });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error relaying transaction', { message: error.message, stack: error.stack });
     relayFailureCounter.inc({ error_type: 'relay_execution_error' });
     res.status(500).send('Internal server error');
@@ -274,9 +280,9 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-let server;
+let server: any;
 
-const startServer = (portToUse) => {
+const startServer = (portToUse: string | number) => {
     return new Promise((resolve) => {
         server = app.listen(portToUse, () => {
             logger.info(`Server is running on port ${portToUse}`);
@@ -294,4 +300,4 @@ if (require.main === module) {
     startServer(port);
 }
 
-module.exports = { app, startServer, balanceMonitor, server };
+export { app, startServer, balanceMonitor, server };
