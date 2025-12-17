@@ -31,6 +31,12 @@ describe('Auth Endpoints', () => {
 
   beforeAll(async () => {
     jest.resetModules();
+    
+    // Setup Env Vars
+    const keypair = web3.Keypair.generate();
+    process.env.SERVER_PRIVATE_KEY = Buffer.from(keypair.secretKey).toString('hex');
+    process.env.JWT_SECRET = 'test-secret';
+
     const index = require('./index');
     app = index.app;
     balanceMonitor = index.balanceMonitor;

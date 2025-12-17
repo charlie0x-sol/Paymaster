@@ -1,53 +1,92 @@
-const web3 = require('@solana/web3.js');
-const bs58 = require('bs58');
+
 const axios = require('axios');
+const { Keypair, Transaction, TransactionInstruction, PublicKey, SystemProgram } = require('@solana/web3.js');
+const bs58 = require('bs58');
+const nacl = require('tweetnacl');
 
-(async () => {
-  try {
-    // Create a new keypair for the client
-    const clientKeypair = web3.Keypair.generate();
+const PAYMASTER_URL = 'http://localhost:3000';
+// const MEMO_PROGRAM_ID = new PublicKey('Memo1UhkJRfHyvLnmEyY2ency7v5tXgQr5A9uC2j6y8');
 
-    // Connect to the devnet
-    const solanaNetwork = process.env.SOLANA_NETWORK || 'devnet';
-    const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
+async function main() {
+    // 1. Generate User
+    const userKeypair = Keypair.generate();
+    console.log(`User Public Key: ${userKeypair.publicKey.toBase58()}`);
 
-    // Airdrop some SOL to the client keypair
-    console.log('Requesting airdrop...');
-    const airdropSignature = await connection.requestAirdrop(
-      clientKeypair.publicKey,
-      web3.LAMPORTS_PER_SOL
-    );
-    await connection.confirmTransaction(airdropSignature);
-    console.log('Airdrop successful!');
+    try {
+        // 2. Authenticate
+        console.log('Authenticating...');
+        const challengeRes = await axios.get(`${PAYMASTER_URL}/challenge`);
+        const { nonce } = challengeRes.data;
 
-    // Create a simple transaction
-    const transaction = new web3.Transaction().add(
-      web3.SystemProgram.transfer({
-        fromPubkey: clientKeypair.publicKey,
-        toPubkey: web3.Keypair.generate().publicKey, // Send to a random new address
-        lamports: web3.LAMPORTS_PER_SOL / 100, // 0.01 SOL
-      })
-    );
+        const message = new TextEncoder().encode(nonce);
+        const signature = nacl.sign.detached(message, userKeypair.secretKey);
+        const signatureBase58 = bs58.default.encode(signature);
 
-    // Set the recent blockhash
-    transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+        const verifyRes = await axios.post(`${PAYMASTER_URL}/verify`, {
+            nonce,
+            publicKey: userKeypair.publicKey.toBase58(),
+            signature: signatureBase58
+        });
 
-    // Sign the transaction with the client's keypair
-    transaction.sign(clientKeypair);
+        const { token } = verifyRes.data;
+        console.log('Authenticated! Token received.');
 
-    // Serialize the transaction
-    const serializedTransaction = transaction.serialize({
-      requireAllSignatures: false, // We don't have the fee payer's signature yet
-    });
+        // 3. Spam Transactions
+        for (let i = 0; i < 5; i++) {
+            console.log(`Sending transaction ${i + 1}/5...`);
+            
+            // Create a System Transfer transaction (0 SOL to self)
+            const instruction = SystemProgram.transfer({
+                fromPubkey: userKeypair.publicKey,
+                toPubkey: userKeypair.publicKey,
+                lamports: 0,
+            });
 
-    const relayUrl = 'http://localhost:3000/relay';
-    console.log('Sending transaction to relayer...');
-    const response = await axios.post(relayUrl, {
-      transaction: serializedTransaction.toString('base64'),
-    });
+            const transaction = new Transaction().add(instruction);
+            
+            // Important: Set fee payer to the user temporarily or leave empty?
+            // The Relayer will set itself as fee payer. 
+            // But we need a recent blockhash.
+            // Since we are relaying, the client usually provides a transaction.
+            // The server code: "const tx = web3.Transaction.from(txBuffer);" 
+            // and "const signingKeypair = keypairs.find(kp => tx.feePayer.equals(kp.publicKey));"
+            // Wait, the server code checks: `tx.feePayer.equals(kp.publicKey)`.
+            // So the CLIENT must set the feePayer to the RELAYER'S public key!
+            
+            // We need to fetch the relayer's public key first or hardcode it.
+            // It is returned in /challenge response: `relayerPublicKey`
+            
+            const relayerPubKeyStr = challengeRes.data.relayerPublicKey;
+            const relayerPubKey = new PublicKey(relayerPubKeyStr);
+            transaction.feePayer = relayerPubKey;
 
-    console.log('Relayer response:', response.data);
-  } catch (error) {
-    console.error('Error:', error.response ? error.response.data : error.message);
-  }
-})();
+            // We also need a recent blockhash. The client normally fetches this.
+            // Since this is a simple script, we can ask the public RPC.
+            const { Connection, clusterApiUrl } = require('@solana/web3.js');
+            const connection = new Connection(clusterApiUrl('devnet'));
+            const { blockhash } = await connection.getLatestBlockhash();
+            transaction.recentBlockhash = blockhash;
+
+            // Sign with user (required for System Transfer)
+            transaction.partialSign(userKeypair);
+            
+            const serializedTx = transaction.serialize({ requireAllSignatures: false });
+            const txBase64 = serializedTx.toString('base64');
+
+            const relayRes = await axios.post(`${PAYMASTER_URL}/relay`, {
+                transaction: txBase64
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            console.log(`Success! Signature: ${relayRes.data.signature}`);
+        }
+
+    } catch (error) {
+        console.error('Error:', error.response ? error.response.data : error.message);
+    }
+}
+
+main();

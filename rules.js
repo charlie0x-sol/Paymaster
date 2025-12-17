@@ -1,5 +1,9 @@
+console.log('Rules: Loading redisClient...');
 const client = require('./redisClient');
+console.log('Rules: Loading config...');
 const config = require('./config');
+console.log('Rules: Loading logger...');
+const { logger } = require('./logger');
 
 class RulesEngine {
   constructor() {
@@ -39,18 +43,27 @@ class RulesEngine {
     }
 
     // 4. Check dynamic gas limit (Cost)
-    // Estimate fee: (Client Signatures + Relayer Signature) * 5000 Lamports
-    // Note: This is a rough estimate. For exact fees, we'd need getFeeForMessage.
-    // Ideally, we assume 1 client signature + 1 relayer signature = 2 * 5000 = 10000 lamports.
-    // If client has multiple signers, we count them.
-    let numSignatures = 1; // Relayer
-    if (transaction.signatures) {
-        numSignatures += transaction.signatures.length;
-    } else {
-        numSignatures += 1; // Assume client signs
+    let estimatedFeeLamports;
+    try {
+      const message = transaction.compileMessage();
+      const feeResponse = await connection.getFeeForMessage(message);
+      if (feeResponse && feeResponse.value !== null) {
+        estimatedFeeLamports = feeResponse.value;
+      } else {
+        throw new Error('Fee response null');
+      }
+    } catch (err) {
+      // Fallback to rough estimate if API fails
+      logger.warn('Failed to get exact fee, using estimate', { error: err.message });
+      let numSignatures = 1; // Relayer
+      if (transaction.signatures) {
+          numSignatures += transaction.signatures.length;
+      } else {
+          numSignatures += 1; // Assume client signs
+      }
+      estimatedFeeLamports = numSignatures * 5000;
     }
-    
-    const estimatedFeeLamports = numSignatures * 5000;
+
     const estimatedFeeSol = estimatedFeeLamports / 1000000000;
 
     const costKey = `txn_cost:${publicKey}`;

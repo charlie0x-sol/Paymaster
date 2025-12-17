@@ -12,13 +12,24 @@ jest.mock('./redisClient', () => ({
 const rulesEngine = require('./rules');
 
 describe('Sponsorship Rules Engine', () => {
+  const mockConnection = {
+    getFeeForMessage: jest.fn().mockResolvedValue({ value: 5000 })
+  };
+
+  const createMockTransaction = (overrides = {}) => ({
+    instructions: [],
+    signatures: [],
+    compileMessage: jest.fn().mockReturnValue('mock-message'),
+    ...overrides
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('should reject a blacklisted user immediately', async () => {
     const blacklistedKey = config.BLACKLIST_ADDRESSES[0];
-    expect(await rulesEngine.isSponsored({}, {}, blacklistedKey)).toBe(false);
+    expect(await rulesEngine.isSponsored(mockConnection, {}, blacklistedKey)).toBe(false);
     expect(client.incr).not.toHaveBeenCalled();
   });
 
@@ -26,16 +37,16 @@ describe('Sponsorship Rules Engine', () => {
     const publicKey = 'test-public-key-onboarding';
     const allowedProgramId = new web3.PublicKey(config.ALLOWED_PROGRAM_IDS[0]);
     
-    const transaction = {
+    const transaction = createMockTransaction({
       instructions: [
         {
           programId: allowedProgramId,
           data: Buffer.from([]),
         }
       ]
-    };
+    });
 
-    expect(await rulesEngine.isSponsored({}, transaction, publicKey)).toBe(true);
+    expect(await rulesEngine.isSponsored(mockConnection, transaction, publicKey)).toBe(true);
     // Should NOT check redis for limit
     expect(client.incr).not.toHaveBeenCalled();
   });
@@ -50,7 +61,7 @@ describe('Sponsorship Rules Engine', () => {
 
     for(let i=1; i<=limit; i++) {
         client.incr.mockResolvedValueOnce(i);
-        expect(await rulesEngine.isSponsored({}, { instructions: [] }, publicKey)).toBe(true);
+        expect(await rulesEngine.isSponsored(mockConnection, createMockTransaction(), publicKey)).toBe(true);
     }
   });
 
@@ -61,16 +72,16 @@ describe('Sponsorship Rules Engine', () => {
     // Return limit + 1
     client.incr.mockResolvedValueOnce(limit + 1);
 
-    const transaction = {
+    const transaction = createMockTransaction({
         instructions: [
             {
                 programId: web3.Keypair.generate().publicKey,
                 data: Buffer.from([]),
             }
         ]
-    };
+    });
 
-    expect(await rulesEngine.isSponsored({}, transaction, publicKey)).toBe(false);
+    expect(await rulesEngine.isSponsored(mockConnection, transaction, publicKey)).toBe(false);
   });
 
   it('should not sponsor transaction if cost limit exceeded', async () => {
@@ -82,11 +93,10 @@ describe('Sponsorship Rules Engine', () => {
     // Cost is exceeded (0.0001 is limit, return 0.0002)
     client.incrByFloat.mockResolvedValueOnce(0.0002);
 
-    const transaction = {
-        instructions: [],
+    const transaction = createMockTransaction({
         signatures: [1] // 1 signature
-    };
+    });
 
-    expect(await rulesEngine.isSponsored({}, transaction, publicKey)).toBe(false);
+    expect(await rulesEngine.isSponsored(mockConnection, transaction, publicKey)).toBe(false);
   });
 });

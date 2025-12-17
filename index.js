@@ -1,4 +1,7 @@
+console.log('Starting server...');
 require('dotenv').config();
+// Fix: Import redisClient first to avoid potential dependency conflicts/hanging
+const client = require('./redisClient');
 const express = require('express');
 const web3 = require('@solana/web3.js');
 const bs58 = require('bs58');
@@ -10,7 +13,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const cors = require('cors');
 const rulesEngine = require('./rules');
-const client = require('./redisClient');
+// const client = require('./redisClient'); // Moved to top
 const { register, relaySuccessCounter, relayFailureCounter } = require('./metrics');
 const BalanceMonitor = require('./monitor');
 const { logger } = require('./logger');
@@ -18,10 +21,14 @@ const { logger } = require('./logger');
 const app = express();
 
 // Trust proxy for rate limiting behind Render's load balancer
-app.enable('trust proxy');
+// See https://expressjs.com/en/guide/behind-proxies.html
+app.set('trust proxy', process.env.TRUST_PROXY || 1);
 
 // CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*';
+if (!process.env.ALLOWED_ORIGINS) {
+  logger.warn('ALLOWED_ORIGINS not set. Defaulting to "*" (all origins). This is insecure for production.');
+}
 app.use(cors({
   origin: allowedOrigins,
   optionsSuccessStatus: 200
@@ -31,12 +38,24 @@ app.use(express.json());
 
 // Connect to Redis
 (async () => {
+    console.log('Connecting to Redis...');
     try {
         await client.connect();
+        console.log('Connected to Redis successfully.');
     } catch (e) {
+        console.error('Failed to connect to Redis', { error: e.message });
         logger.error('Failed to connect to Redis', { error: e.message });
+        process.exit(1); // Exit if Redis fails
     }
 })();
+
+// Debug Environment Variables
+console.log('DEBUG: Environment Variables Keys:', Object.keys(process.env));
+if (process.env.SERVER_PRIVATE_KEY) {
+    console.log(`DEBUG: SERVER_PRIVATE_KEY length: ${process.env.SERVER_PRIVATE_KEY.length}`);
+} else {
+    console.log('DEBUG: SERVER_PRIVATE_KEY is MISSING from process.env');
+}
 
 // General rate limiting
 const limiter = rateLimit({
@@ -59,23 +78,34 @@ const strictLimiter = rateLimit({
   }),
 });
 
+console.log('Loading keypairs...');
 const keypairs = [];
 if (process.env.SERVER_PRIVATE_KEY) {
+    console.log('Loading SERVER_PRIVATE_KEY...');
     try {
-        keypairs.push(web3.Keypair.fromSecretKey(Buffer.from(process.env.SERVER_PRIVATE_KEY, 'hex')));
+        const secretKeyBuffer = Buffer.from(process.env.SERVER_PRIVATE_KEY, 'hex');
+        console.log(`DEBUG: Secret Key Buffer Length: ${secretKeyBuffer.length}`);
+        keypairs.push(web3.Keypair.fromSecretKey(secretKeyBuffer));
+        console.log('SERVER_PRIVATE_KEY loaded successfully.');
     } catch (e) {
+        console.error('Failed to load SERVER_PRIVATE_KEY', { error: e.message });
         logger.error('Failed to load SERVER_PRIVATE_KEY', { error: e.message });
     }
 }
 if (process.env.SERVER_PRIVATE_KEY_OLD) {
+    console.log('Loading SERVER_PRIVATE_KEY_OLD...');
     try {
         keypairs.push(web3.Keypair.fromSecretKey(Buffer.from(process.env.SERVER_PRIVATE_KEY_OLD, 'hex')));
+        console.log('SERVER_PRIVATE_KEY_OLD loaded successfully.');
     } catch (e) {
+        console.error('Failed to load SERVER_PRIVATE_KEY_OLD', { error: e.message });
         logger.error('Failed to load SERVER_PRIVATE_KEY_OLD', { error: e.message });
     }
 }
+console.log('Keypairs loaded:', keypairs.length);
 
 if (keypairs.length === 0) {
+    console.error('No server private keys found! Exiting...');
     logger.error('No server private keys found! Exiting...');
     process.exit(1);
 }
@@ -108,7 +138,7 @@ const connection = new web3.Connection(web3.clusterApiUrl(solanaNetwork));
 
 // Start Balance Monitor (Monitor primary key)
 const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);
-// Don't start it immediately in test mode usually, but for this prototype it's fine.
+// Don't start it immediately in test mode usually.
 // We can handle cleanup in exports.
 
 app.get('/', (req, res) => {
@@ -253,10 +283,14 @@ const startServer = (portToUse) => {
             balanceMonitor.start();
             resolve(server);
         });
+        server.setTimeout(30000); // 30 seconds timeout
+        server.keepAliveTimeout = 30000;
+        server.headersTimeout = 31000;
     });
 };
 
 if (require.main === module) {
+    console.log('Starting server...');
     startServer(port);
 }
 

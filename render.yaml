@@ -9,6 +9,8 @@ services:
         value: "10000"
       - key: SOLANA_NETWORK
         value: devnet
+      - key: TRUST_PROXY
+        value: "1"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -20,6 +22,14 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: ALLOWED_PROGRAM_IDS
+        sync: false
+      - key: BLACKLIST_ADDRESSES
+        sync: false
+      - key: MAX_SPONSORED_TRANSACTIONS
+        value: "5"
+      - key: MAX_SPONSORED_AMOUNT_SOL
+        value: "0.0001"
 
   - type: redis
     name: paymaster-redis

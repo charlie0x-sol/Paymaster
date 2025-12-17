@@ -16,27 +16,60 @@ This relayer is designed to be a flexible and robust solution that can be custom
 
 ## Getting Started
 
-To get the relayer running locally, follow these steps:
+Follow these steps to get the relayer running locally:
 
-1.  **Clone the repository:**
+### 1. Installation
+
+```bash
+git clone <repository-url>
+cd Paymaster
+npm install
+```
+
+### 2. Configuration
+
+1.  **Copy the example environment file:**
     ```bash
-    git clone <repository-url>
-    cd Paymaster
+    cp .env.example .env
     ```
 
-2.  **Install dependencies:**
+2.  **Generate a Relay Wallet:**
+    Run the helper script to generate a new keypair. This will output a Hex string.
     ```bash
-    npm install
+    node generateKeypair.js
     ```
+    *Copy the `Private Key (Hex)` output and paste it into your `.env` file as `SERVER_PRIVATE_KEY`.*
 
-3.  **Create a `.env` file:**
-    Create a `.env` file in the root of the project and add the necessary environment variables. See the [Configuration](#configuration) section for more details.
+3.  **Fund the Wallet:**
+    The generated wallet needs SOL to pay for transaction fees. Copy the **Public Key** from the output above and fund it using a faucet (e.g., [Solana Faucet](https://faucet.solana.com/)) or transfer devnet SOL to it.
 
-4.  **Start the server:**
-    ```bash
-    npm start
-    ```
-    The server will start on port 3000 by default.
+4.  **Set JWT Secret:**
+    Update `JWT_SECRET` in `.env` to a secure random string.
+
+### 3. Run the Server
+
+```bash
+# Ensure you have a Redis instance running (e.g., via docker-compose up -d redis)
+npm start
+```
+*Note: You need a running Redis instance. You can use `docker-compose up -d` to start everything including Redis.*
+
+### 4. Run the Live Demo
+
+We provide a self-contained demo script that spins up the server and simulates a client interaction (authenticating and sending sponsored transactions).
+
+```bash
+node run_demo.js
+```
+
+### 5. Client Example
+
+You can find a standalone client example in the `client-example/` directory.
+
+```bash
+cd client-example
+node send-tx.js
+```
 
 ## Configuration
 

@@ -38,6 +38,7 @@ jest.mock('@solana/web3.js', () => {
       sendRawTransaction: jest.fn().mockResolvedValue('mock-tx-sig'),
       getBalance: jest.fn().mockResolvedValue(2 * 1000000000), // 2 SOL in lamports
       simulateTransaction: jest.fn().mockResolvedValue({ value: { err: null, logs: [] } }),
+      getFeeForMessage: jest.fn().mockResolvedValue({ value: 5000 }),
     })),
     sendAndConfirmRawTransaction: jest.fn().mockResolvedValue('mock-tx-sig'),
   };
@@ -48,6 +49,12 @@ describe('End-to-End Flow', () => {
 
   beforeAll(async () => {
     jest.resetModules();
+
+    // Setup Env Vars
+    const keypair = web3.Keypair.generate();
+    process.env.SERVER_PRIVATE_KEY = Buffer.from(keypair.secretKey).toString('hex');
+    process.env.JWT_SECRET = 'test-secret';
+
     const index = require('./index');
     app = index.app;
     balanceMonitor = index.balanceMonitor;

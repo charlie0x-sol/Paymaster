@@ -38,6 +38,7 @@ jest.mock('@solana/web3.js', () => {
       sendRawTransaction: jest.fn().mockResolvedValue('mock-tx-sig'),
       getBalance: jest.fn().mockResolvedValue(2 * 1000000000),
       simulateTransaction: jest.fn().mockResolvedValue({ value: { err: null, logs: [] } }),
+      getFeeForMessage: jest.fn().mockResolvedValue({ value: 5000 }),
     })),
     sendAndConfirmRawTransaction: jest.fn().mockResolvedValue('mock-tx-sig'),
   };
@@ -57,6 +58,7 @@ describe('Key Rotation', () => {
     // Set env vars
     process.env.SERVER_PRIVATE_KEY = Buffer.from(primaryKey.secretKey).toString('hex');
     process.env.SERVER_PRIVATE_KEY_OLD = Buffer.from(oldKey.secretKey).toString('hex');
+    process.env.JWT_SECRET = 'test-secret';
 
     const index = require('./index');
     app = index.app;
