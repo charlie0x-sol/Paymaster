@@ -69,7 +69,7 @@ class RulesEngine {
     const costKey = `txn_cost:${publicKey}`;
     // incrbyfloat returns string in some redis versions, or float.
     // We store as string or float.
-    const currentCost = await client.incrByFloat(costKey, estimatedFeeSol);
+    const currentCost = parseFloat(await client.incrByFloat(costKey, estimatedFeeSol));
 
     if (currentCost > config.MAX_SPONSORED_AMOUNT_SOL) {
       return false;
