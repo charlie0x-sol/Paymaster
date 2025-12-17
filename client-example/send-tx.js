@@ -1,6 +1,6 @@
 
 const axios = require('axios');
-const { Keypair, Transaction, TransactionInstruction, PublicKey, SystemProgram } = require('@solana/web3.js');
+const { Keypair, Transaction, TransactionInstruction, PublicKey, SystemProgram, ComputeBudgetProgram } = require('@solana/web3.js');
 const bs58 = require('bs58');
 const nacl = require('tweetnacl');
 
@@ -35,14 +35,32 @@ async function main() {
         for (let i = 0; i < 5; i++) {
             console.log(`Sending transaction ${i + 1}/5...`);
             
+            const transaction = new Transaction();
+
+            // --- Priority Fee Instructions ---
+            // 1. Set Compute Unit Price (Priority Fee)
+            // Values are in microLamports. 1000 is a modest fee. 
+            // During congestion, this might need to be 50,000+.
+            const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: 1000 
+            });
+            transaction.add(priorityFeeInstruction);
+
+            // 2. Set Compute Unit Limit (Optional but recommended)
+            // System Transfer takes ~150-300 units. We give a safe buffer.
+            const computeLimitInstruction = ComputeBudgetProgram.setComputeUnitLimit({
+                units: 2000 
+            });
+            transaction.add(computeLimitInstruction);
+            // ---------------------------------
+
             // Create a System Transfer transaction (0 SOL to self)
-            const instruction = SystemProgram.transfer({
+            const transferInstruction = SystemProgram.transfer({
                 fromPubkey: userKeypair.publicKey,
                 toPubkey: userKeypair.publicKey,
                 lamports: 0,
             });
-
-            const transaction = new Transaction().add(instruction);
+            transaction.add(transferInstruction);
             
             // Important: Set fee payer to the user temporarily or leave empty?
             // The Relayer will set itself as fee payer. 
