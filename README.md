@@ -12,7 +12,9 @@ This relayer is designed to be a flexible and robust solution that can be custom
 *   **Authentication:** A challenge-response mechanism ensures that only authorized users can use the relayer.
 *   **Key Rotation:** Supports primary and secondary signing keys for seamless key rotation.
 *   **Metrics and Monitoring:** Exposes a `/metrics` endpoint for Prometheus scraping, and includes a balance monitor for the relayer's wallet.
-*   **Priority Fees Support:** The relayer can process transactions that include `ComputeBudgetProgram` instructions for priority fees, ensuring reliability during network congestion.
+*   **Reliable Transaction Sender:** Enhanced delivery system with aggressive rebroadcasting (every 2s) to ensure transactions land during congestion.
+*   **Dynamic Fee Estimation:** Built-in intelligence to recommend priority fees based on real-time network activity.
+*   **Smart Client SDK:** Includes a robust wrapper (`SmartClient.js`) that handles authentication, fee management, and automatic retries for you.
 *   **Containerized:** Ships with a `Dockerfile` and `docker-compose.yml` for easy deployment.
 
 ## Getting Started
@@ -103,6 +105,19 @@ Generates a unique nonce for the client to sign. This is the first step in the a
     {
       "nonce": "a1b2c3d4...",
       "relayerPublicKey": "..."
+    }
+    ```
+
+### `GET /fees`
+
+Fetches recommended priority fees and a fresh blockhash from the relayer's perspective. Use this to ensure your transaction is landable.
+
+*   **Response:**
+    ```json
+    {
+      "priorityFee": 11000,
+      "blockhash": "...",
+      "lastValidBlockHeight": 123456
     }
     ```
 
