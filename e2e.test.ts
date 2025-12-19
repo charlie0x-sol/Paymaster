@@ -15,6 +15,10 @@ jest.mock('@solana/web3.js', () => {
       simulateTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
       sendRawTransaction: jest.fn().mockResolvedValue('mock-signature'),
       getFeeForMessage: jest.fn().mockResolvedValue({ value: 5000 }),
+      getRecentPrioritizationFees: jest.fn().mockResolvedValue([{ slot: 100, prioritizationFee: 1000 }]),
+      getLatestBlockhash: jest.fn().mockResolvedValue({ blockhash: 'mock-blockhash', lastValidBlockHeight: 999999 }),
+      getBlockHeight: jest.fn().mockResolvedValue(100),
+      confirmTransaction: jest.fn().mockResolvedValue({ value: { err: null } }),
     })),
     sendAndConfirmRawTransaction: jest.fn().mockResolvedValue('mock-signature'),
   };

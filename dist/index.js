@@ -55,6 +55,8 @@ const rules_1 = __importDefault(require("./rules"));
 const metrics_1 = require("./metrics");
 const monitor_1 = __importDefault(require("./monitor"));
 const logger_1 = require("./logger");
+const fees_1 = require("./fees");
+const transactionSender_1 = require("./transactionSender");
 const app = (0, express_1.default)();
 exports.app = app;
 // Trust proxy for rate limiting behind Render's load balancer
@@ -168,12 +170,29 @@ const balanceMonitor = new monitor_1.default(connection, primaryKeypair.publicKe
 exports.balanceMonitor = balanceMonitor;
 // Don't start it immediately in test mode usually.
 // We can handle cleanup in exports.
+const feeEstimator = new fees_1.FeeEstimator(connection);
+const transactionSender = new transactionSender_1.TransactionSender(connection);
 app.get('/', (req, res) => {
     res.send({
         service: 'paymaster-relayer',
         status: 'running',
         relayerPublicKey: primaryKeypair.publicKey.toBase58(),
     });
+});
+app.get('/fees', async (req, res) => {
+    try {
+        const priorityFee = await feeEstimator.getPriorityFeeEstimate();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        res.send({
+            priorityFee,
+            blockhash,
+            lastValidBlockHeight
+        });
+    }
+    catch (e) {
+        logger_1.logger.error('Error in /fees', { error: e.message });
+        res.status(500).send('Error fetching fee data');
+    }
 });
 app.get('/metrics', async (req, res) => {
     try {
@@ -214,7 +233,7 @@ app.post('/verify', strictLimiter, async (req, res) => {
 app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
     logger_1.logger.info('POST /relay', { publicKey: req.user.publicKey });
     try {
-        const { transaction } = req.body;
+        const { transaction, lastValidBlockHeight } = req.body;
         if (!transaction) {
             logger_1.logger.warn('Invalid relay request: missing transaction');
             metrics_1.relayFailureCounter.inc({ error_type: 'missing_transaction' });
@@ -271,8 +290,17 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req, res) => {
             metrics_1.relayFailureCounter.inc({ error_type: 'serialization_failed' });
             throw e;
         }
-        logger_1.logger.info('Sending transaction');
-        const signature = await web3.sendAndConfirmRawTransaction(connection, serializedTx);
+        logger_1.logger.info('Sending transaction via robust sender');
+        // Use provided lastValidBlockHeight or fetch current
+        let lvbh = lastValidBlockHeight;
+        if (!lvbh) {
+            const latest = await connection.getLatestBlockhash();
+            lvbh = latest.lastValidBlockHeight;
+        }
+        const signature = await transactionSender.sendAndConfirm(serializedTx, {
+            blockhash: tx.recentBlockhash,
+            lastValidBlockHeight: lvbh
+        });
         logger_1.logger.info('Transaction relayed successfully', { signature });
         metrics_1.relaySuccessCounter.inc();
         res.send({ success: true, signature });

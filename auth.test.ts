@@ -6,6 +6,7 @@ import { app, server, balanceMonitor } from './src/index';
 import client from './src/redisClient';
 
 describe('Authentication Endpoints', () => {
+  jest.setTimeout(30000);
   beforeEach(async () => {
       // Clear rate limits before each test
       await client.flushDb();

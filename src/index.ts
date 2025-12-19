@@ -18,6 +18,8 @@ import rulesEngine from './rules';
 import { register, relaySuccessCounter, relayFailureCounter } from './metrics';
 import BalanceMonitor from './monitor';
 import { logger } from './logger';
+import { FeeEstimator } from './fees';
+import { TransactionSender } from './transactionSender';
 
 const app = express();
 
@@ -147,12 +149,30 @@ const balanceMonitor = new BalanceMonitor(connection, primaryKeypair.publicKey);
 // Don't start it immediately in test mode usually.
 // We can handle cleanup in exports.
 
+const feeEstimator = new FeeEstimator(connection);
+const transactionSender = new TransactionSender(connection);
+
 app.get('/', (req: Request, res: Response) => {
   res.send({
     service: 'paymaster-relayer',
     status: 'running',
     relayerPublicKey: primaryKeypair.publicKey.toBase58(),
   });
+});
+
+app.get('/fees', async (req: Request, res: Response) => {
+  try {
+    const priorityFee = await feeEstimator.getPriorityFeeEstimate();
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    res.send({
+      priorityFee,
+      blockhash,
+      lastValidBlockHeight
+    });
+  } catch (e: any) {
+    logger.error('Error in /fees', { error: e.message });
+    res.status(500).send('Error fetching fee data');
+  }
 });
 
 app.get('/metrics', async (req: Request, res: Response) => {
@@ -202,7 +222,7 @@ app.post('/verify', strictLimiter, async (req: Request, res: Response) => {
 app.post('/relay', strictLimiter, authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   logger.info('POST /relay', { publicKey: req.user.publicKey });
   try {
-    const { transaction } = req.body;
+    const { transaction, lastValidBlockHeight } = req.body;
     if (!transaction) {
       logger.warn('Invalid relay request: missing transaction');
       relayFailureCounter.inc({ error_type: 'missing_transaction' });
@@ -266,8 +286,22 @@ app.post('/relay', strictLimiter, authenticateJWT, async (req: AuthenticatedRequ
         throw e;
     }
 
-    logger.info('Sending transaction');
-    const signature = await web3.sendAndConfirmRawTransaction(connection, serializedTx);
+    logger.info('Sending transaction via robust sender');
+    
+    // Use provided lastValidBlockHeight or fetch current
+    let lvbh = lastValidBlockHeight;
+    if (!lvbh) {
+        const latest = await connection.getLatestBlockhash();
+        lvbh = latest.lastValidBlockHeight;
+    }
+
+    const signature = await transactionSender.sendAndConfirm(
+        serializedTx,
+        {
+            blockhash: tx.recentBlockhash!,
+            lastValidBlockHeight: lvbh
+        }
+    );
 
     logger.info('Transaction relayed successfully', { signature });
     relaySuccessCounter.inc();

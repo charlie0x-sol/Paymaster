@@ -1,4 +1,16 @@
 import * as web3 from '@solana/web3.js';
+
+// Mock config
+jest.mock('./src/config', () => ({
+  __esModule: true,
+  default: {
+    ALLOWED_PROGRAM_IDS: ['Memo1UhkJRfHyvLnmEyY2ency7v5tXgQr5A9uC2j6y8'],
+    BLACKLIST_ADDRESSES: ['BadActorAddress1111111111111111111111111111'],
+    MAX_SPONSORED_TRANSACTIONS: 5,
+    MAX_SPONSORED_AMOUNT_SOL: 0.0001,
+  }
+}));
+
 import config from './src/config';
 
 // Mock redis client
